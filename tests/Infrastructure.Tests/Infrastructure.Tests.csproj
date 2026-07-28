@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AF86DBB2-DBD7-4A7F-9E12-E5D9CA505F45}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>CodexBalanceWidget.Infrastructure.Tests</RootNamespace>
+    <AssemblyName>Infrastructure.Tests</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <TargetFrameworkProfile />
+    <LangVersion>5</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\src\CodexBalanceWidget.App\Infrastructure\AvatarImageService.cs">
+      <Link>Infrastructure\AvatarImageService.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\CodexBalanceWidget.App\Infrastructure\WidgetSettings.cs">
+      <Link>Infrastructure\WidgetSettings.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\CodexBalanceWidget.App\Infrastructure\WidgetSettingsStore.cs">
+      <Link>Infrastructure\WidgetSettingsStore.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CodexBalanceWidget.Core\CodexBalanceWidget.Core.csproj">
+      <Project>{C9403FC3-1FCF-4CD1-BD48-29FEE71136F8}</Project>
+      <Name>CodexBalanceWidget.Core</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

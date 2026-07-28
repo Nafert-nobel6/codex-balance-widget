@@ -1,0 +1,17 @@
+<Application x:Class="CodexBalanceWidget.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <FontFamily x:Key="UiFont">Segoe UI, Microsoft YaHei UI</FontFamily>
+        <SolidColorBrush x:Key="PanelBrush" Color="#F71A1C22"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#FF24272F"/>
+        <SolidColorBrush x:Key="CardHoverBrush" Color="#FF2B2E38"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#FFF5F6F8"/>
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#FF9EA4B1"/>
+        <SolidColorBrush x:Key="SubtleTextBrush" Color="#FF737986"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF70E1B2"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#FFFFC66D"/>
+        <SolidColorBrush x:Key="DividerBrush" Color="#FF30333D"/>
+    </Application.Resources>
+</Application>
