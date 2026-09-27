@@ -12,6 +12,11 @@ Codex 的 MSIX 安装目录。
 `codex app-server` 负责。卸载器只删除上述 Run 值和组件安装目录；它不会
 访问或删除 `%USERPROFILE%\.codex`、Codex 设置、会话或凭据。
 
+1.1 为检测账号切换，每秒只查询 `CODEX_HOME/auth.json`（默认
+`%USERPROFILE%\.codex\auth.json`）的文件元数据，不打开或解析内容。
+`account/read` 返回的账号信息仅用于判断登录类型，不记录邮箱或账号详情。
+变更后清空旧快照并终止旧连接，防止跨账号复用额度。
+
 重置卡是只读信息。程序不得调用
 `account/rateLimitResetCredit/consume`，也不得为缺失的额度窗口或卡片到期
 明细编造数值。
@@ -68,6 +73,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Collect-Diagno
 - [ ] 没有可信运行时时，安装成功且状态明确为 `runtime pending`。
 - [ ] Codex 未运行时组件无可见窗口；Codex 启动后无需点击即可出现。
 - [ ] Codex 窗口最大化后 250 ms 内隐藏，恢复/最小化后重新显示。
+- [ ] 默认气泡保持普通应用下层；单击后非激活置顶且不转移键盘焦点，自动收回或隐藏后解除置顶。
 - [ ] 仅在 Codex 完全退出后关闭私有 app-server 并隐藏组件。
 - [ ] 主屏 100%、125%、150%、200% DPI 及任务栏尺寸变化下位置正确。
 - [ ] 周额度和 5 小时额度按时长识别；缺失额度显示不可用而不是 100%。

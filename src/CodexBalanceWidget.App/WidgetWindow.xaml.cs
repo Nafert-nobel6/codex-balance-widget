@@ -58,6 +58,7 @@ namespace CodexBalanceWidget.App
         private const uint SwpNoMove = 0x0002;
         private const uint SwpNoActivate = 0x0010;
         private const uint SwpNoOwnerZOrder = 0x0200;
+        private static readonly IntPtr HwndTopmost = new IntPtr(-1);
         private static readonly IntPtr HwndBottom = new IntPtr(1);
 
         private readonly WidgetViewModel _viewModel;
@@ -82,6 +83,7 @@ namespace CodexBalanceWidget.App
         private bool _quickSliderCaptured;
         private bool _bubbleDragged;
         private bool _isExpandedDragging;
+        private bool _isInteractionTopmost;
         private IntPtr _handle;
         private DateTime _lastInteractionUtc;
         private Rect _expandedBounds;
@@ -216,7 +218,7 @@ namespace CodexBalanceWidget.App
                 AnchorToPrimaryWorkArea();
             }
             UpdateQuickSliderPosition();
-            KeepAtBottom();
+            ApplyInteractionZOrder();
         }
 
         private void OnSourceInitialized(object sender, EventArgs e)
@@ -347,7 +349,6 @@ namespace CodexBalanceWidget.App
             }
 
             ShowWithoutActivation();
-            KeepAtBottom();
         }
 
         private void ShowWithoutActivation()
@@ -360,7 +361,7 @@ namespace CodexBalanceWidget.App
                 {
                     AnchorToPrimaryWorkArea();
                 }
-                KeepAtBottom();
+                ApplyInteractionZOrder();
 
                 return;
             }
@@ -372,7 +373,7 @@ namespace CodexBalanceWidget.App
                 {
                     AnchorToPrimaryWorkArea();
                 }
-                KeepAtBottom();
+                ApplyInteractionZOrder();
             }
         }
 
@@ -380,6 +381,7 @@ namespace CodexBalanceWidget.App
         {
             SettingsPopup.IsOpen = false;
             _bubbleHoverTimer.Stop();
+            SetInteractionTopmost(false);
             if (!_isArchived && !_isTransitioning)
             {
                 CollapseToBubbleWithoutAnimation(true);
@@ -408,8 +410,19 @@ namespace CodexBalanceWidget.App
             _expandedBounds = new Rect(desiredLeft, desiredTop, target.Width, target.Height);
         }
 
-        private void KeepAtBottom()
+        private void SetInteractionTopmost(bool enabled)
         {
+            _isInteractionTopmost = enabled;
+            ApplyInteractionZOrder();
+        }
+
+        private void ApplyInteractionZOrder()
+        {
+            if (Topmost != _isInteractionTopmost)
+            {
+                Topmost = _isInteractionTopmost;
+            }
+
             if (_handle == IntPtr.Zero || !IsVisible)
             {
                 return;
@@ -417,7 +430,7 @@ namespace CodexBalanceWidget.App
 
             SetWindowPos(
                 _handle,
-                HwndBottom,
+                _isInteractionTopmost ? HwndTopmost : HwndBottom,
                 0,
                 0,
                 0,
@@ -456,7 +469,7 @@ namespace CodexBalanceWidget.App
             {
                 _layoutMode = LayoutMode.Minimal;
             }
-            else if (height <= 218.0)
+            else if (height <= 250.0)
             {
                 _layoutMode = LayoutMode.Horizontal;
             }
@@ -499,6 +512,13 @@ namespace CodexBalanceWidget.App
 
         private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton == MouseButton.Left &&
+                !_isArchived &&
+                !_isTransitioning)
+            {
+                SetInteractionTopmost(true);
+            }
+
             MarkInteraction();
         }
 
@@ -642,6 +662,22 @@ namespace CodexBalanceWidget.App
             Width = target.Width;
             Height = target.Height;
             _savedBubbleTop = Top;
+            SetInteractionTopmost(false);
+        }
+
+        private void OnMinimizeClick(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (_isArchived || _isTransitioning)
+            {
+                return;
+            }
+
+            SettingsPopup.IsOpen = false;
+            _isExpandedDragging = false;
+            ExpandedDragHandle.ReleaseMouseCapture();
+            CollapseToBubbleWithoutAnimation(true);
+            ScheduleSaveSettings();
         }
 
         private void OnArchiveTimerTick(object sender, EventArgs e)
@@ -731,7 +767,7 @@ namespace CodexBalanceWidget.App
             ArchiveBubbleSurface.Opacity = 1.0;
             _isTransitioning = false;
             _savedBubbleTop = Top;
-            KeepAtBottom();
+            SetInteractionTopmost(false);
             ScheduleSaveSettings();
         }
 
@@ -789,7 +825,7 @@ namespace CodexBalanceWidget.App
             AnimateDouble(bubbleScale, ScaleTransform.ScaleXProperty, 1.0, 1.08, 280.0, sharedEase);
             AnimateDouble(bubbleScale, ScaleTransform.ScaleYProperty, 1.0, 1.08, 280.0, sharedEase);
             AnimateDouble(ArchiveBubbleSurface, OpacityProperty, 1.0, 0.0, 280.0, sharedEase);
-            KeepAtBottom();
+            ApplyInteractionZOrder();
         }
 
         private void CompleteRestore()
@@ -813,7 +849,7 @@ namespace CodexBalanceWidget.App
             MainPanel.Opacity = 1.0;
             ApplyResponsiveLayout();
             MarkInteraction();
-            KeepAtBottom();
+            ApplyInteractionZOrder();
         }
 
         private void ApplyResponsiveLayoutForSize(double width, double height)
@@ -1011,6 +1047,7 @@ namespace CodexBalanceWidget.App
             }
             else
             {
+                SetInteractionTopmost(true);
                 BeginRestore();
             }
 

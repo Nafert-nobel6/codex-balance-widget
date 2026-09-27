@@ -82,6 +82,27 @@ namespace CodexBalanceWidget.Core
             try
             {
                 var connection = GetActiveConnection();
+                EnsureCurrentAccount(connection);
+                var accountResult = await connection.RequestAsync(
+                    "account/read",
+                    new Dictionary<string, object> { { "refreshToken", false } },
+                    cancellationToken).ConfigureAwait(false) as IDictionary<string, object>;
+                EnsureCurrentAccount(connection);
+                object account;
+                if (accountResult == null || !accountResult.TryGetValue("account", out account))
+                {
+                    throw new InvalidDataException("The account response is invalid.");
+                }
+                var accountObject = account as IDictionary<string, object>;
+                object accountType;
+                if (accountObject == null ||
+                    !accountObject.TryGetValue("type", out accountType) ||
+                    !string.Equals(accountType as string, "chatgpt", StringComparison.Ordinal))
+                {
+                    return ClearAccountSnapshot(accountObject == null
+                        ? "请在 Codex 中登录账号"
+                        : "当前登录方式不提供 ChatGPT 额度");
+                }
                 var result = await connection.RequestAsync(
                     "account/rateLimits/read",
                     null,
@@ -98,10 +119,11 @@ namespace CodexBalanceWidget.Core
                     DateTimeOffset.UtcNow);
                 lock (_lifecycleLock)
                 {
+                    EnsureCurrentAccount(connection);
                     _lastSnapshot = snapshot;
+                    Publish(snapshot);
                 }
 
-                Publish(snapshot);
                 return snapshot;
             }
             catch
@@ -192,6 +214,7 @@ namespace CodexBalanceWidget.Core
             while (!cancellationToken.IsCancellationRequested)
             {
                 AppServerConnection connection = null;
+                Task accountWatch = null;
                 try
                 {
                     connection = new AppServerConnection(
@@ -199,6 +222,7 @@ namespace CodexBalanceWidget.Core
                         _logger,
                         RequestTimeout);
                     connection.Start(cancellationToken);
+                    accountWatch = WatchAccountAsync(connection, cancellationToken);
                     lock (_lifecycleLock)
                     {
                         _connection = connection;
@@ -230,7 +254,7 @@ namespace CodexBalanceWidget.Core
                 }
                 catch (OperationCanceledException)
                 {
-                    break;
+                    // Dispose the connection and join its watcher below.
                 }
                 catch (Exception exception)
                 {
@@ -254,6 +278,12 @@ namespace CodexBalanceWidget.Core
                     {
                         connection.Dispose();
                     }
+                }
+
+                if (accountWatch != null)
+                {
+                    try { await accountWatch.ConfigureAwait(false); }
+                    catch (OperationCanceledException) { }
                 }
 
                 if (cancellationToken.IsCancellationRequested)
@@ -340,9 +370,73 @@ namespace CodexBalanceWidget.Core
                     _logger.Warn(
                         "Rate-limit refresh failed (" +
                         exception.GetType().Name +
-                        "); keeping the last snapshot.");
+                        "); reconnecting before retry.");
+                    throw;
                 }
             }
+        }
+
+        private async Task WatchAccountAsync(
+            AppServerConnection connection, CancellationToken cancellationToken)
+        {
+            while (!connection.IsDisposed)
+            {
+                await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+                if (connection.IsDisposed) { return; }
+                if (connection.AuthenticationStateChanged)
+                {
+                    lock (_lifecycleLock)
+                    {
+                        ClearAccountSnapshot("账号状态已变化，正在重新同步");
+                        connection.Dispose();
+                    }
+                    return;
+                }
+            }
+        }
+
+        private void EnsureCurrentAccount(AppServerConnection connection)
+        {
+            if (connection.AuthenticationStateChanged)
+            {
+                ClearAccountSnapshot("账号状态已变化，正在重新同步");
+                connection.Dispose();
+                throw new IOException("Account state changed; reconnecting.");
+            }
+        }
+
+        private RateLimitSnapshot ClearAccountSnapshot(string message)
+        {
+            lock (_lifecycleLock)
+            {
+                var snapshot = new RateLimitSnapshot(
+                    new List<QuotaWindow>(), 0, false, new List<ResetCredit>(),
+                    DateTimeOffset.UtcNow, message, true);
+                _lastSnapshot = snapshot;
+                Publish(snapshot);
+                return snapshot;
+            }
+        }
+
+        // Only file metadata is inspected. Credentials are never opened or parsed.
+        private static string ReadAuthenticationStamp()
+        {
+            try
+            {
+                var codexHome = Environment.GetEnvironmentVariable("CODEX_HOME");
+                if (string.IsNullOrWhiteSpace(codexHome))
+                {
+                    codexHome = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
+                }
+                var file = new FileInfo(Path.Combine(codexHome, "auth.json"));
+                file.Refresh();
+                return file.Exists
+                    ? file.CreationTimeUtc.Ticks + ":" + file.LastWriteTimeUtc.Ticks + ":" + file.Length
+                    : "missing";
+            }
+            catch (IOException) { return "unavailable"; }
+            catch (UnauthorizedAccessException) { return "unavailable"; }
         }
 
         private AppServerConnection GetActiveConnection()
@@ -380,9 +474,8 @@ namespace CodexBalanceWidget.Core
                     "Temporarily unavailable; showing the last successful update.",
                     true);
                 _lastSnapshot = previous;
+                Publish(previous);
             }
-
-            Publish(previous);
         }
 
         private void Publish(RateLimitSnapshot snapshot)
@@ -436,6 +529,9 @@ namespace CodexBalanceWidget.Core
             private StreamWriter _input;
             private long _nextRequestId;
             private bool _disposed;
+            private readonly string _authenticationStamp;
+            private int _accountChanged;
+            private string _accountNotificationStamp;
 
             public AppServerConnection(
                 string executablePath,
@@ -445,12 +541,22 @@ namespace CodexBalanceWidget.Core
                 _executablePath = executablePath;
                 _logger = logger;
                 _requestTimeout = requestTimeout;
+                _authenticationStamp = ReadAuthenticationStamp();
                 RateLimitChanged = new SemaphoreSlim(0);
             }
 
             public SemaphoreSlim RateLimitChanged { get; private set; }
             public Task ReaderTask { get; private set; }
             public bool IsInitialized { get; private set; }
+            public bool IsDisposed { get { return _disposed; } }
+            public bool AuthenticationStateChanged
+            {
+                get
+                {
+                    return Interlocked.CompareExchange(ref _accountChanged, 0, 0) != 0 ||
+                        !string.Equals(_authenticationStamp, ReadAuthenticationStamp(), StringComparison.Ordinal);
+                }
+            }
 
             public void Start(CancellationToken cancellationToken)
             {
@@ -497,7 +603,7 @@ namespace CodexBalanceWidget.Core
                 var clientInfo = new Dictionary<string, object>();
                 clientInfo["name"] = "codex_balance_widget";
                 clientInfo["title"] = "Codex Balance Widget";
-                clientInfo["version"] = "1.0.0";
+                clientInfo["version"] = "1.1.0";
 
                 var parameters = new Dictionary<string, object>();
                 parameters["clientInfo"] = clientInfo;
@@ -588,12 +694,14 @@ namespace CodexBalanceWidget.Core
 
             public void Dispose()
             {
-                if (_disposed)
+                lock (_pendingLock)
                 {
-                    return;
+                    if (_disposed)
+                    {
+                        return;
+                    }
+                    _disposed = true;
                 }
-
-                _disposed = true;
                 IsInitialized = false;
                 FailPending(
                     new IOException("The Codex app-server connection closed."));
@@ -626,8 +734,8 @@ namespace CodexBalanceWidget.Core
                     _process.Dispose();
                 }
 
-                _writeLock.Dispose();
-                RateLimitChanged.Dispose();
+                // Waiters/writers may still be unwinding after process termination.
+                // These managed semaphores are collected with the connection.
             }
 
             private async Task ReadLoopAsync(
@@ -681,6 +789,31 @@ namespace CodexBalanceWidget.Core
                         if (message.TryGetValue("method", out methodValue))
                         {
                             var method = methodValue as string;
+                            if (string.Equals(
+                                method, "account/updated", StringComparison.Ordinal))
+                            {
+                                object notificationParameters;
+                                if (message.TryGetValue("params", out notificationParameters))
+                                {
+                                    var accountState = notificationParameters as IDictionary<string, object>;
+                                    object mode;
+                                    object plan;
+                                    if (accountState != null && accountState.TryGetValue("authMode", out mode))
+                                    {
+                                        accountState.TryGetValue("planType", out plan);
+                                        var stamp = (mode as string ?? string.Empty) + "\n" +
+                                            (plan as string ?? string.Empty);
+                                        // account/read can emit an unchanged account/updated notification.
+                                        // Establish a baseline and reconnect only for a real state change.
+                                        if (_accountNotificationStamp != null &&
+                                            !string.Equals(_accountNotificationStamp, stamp, StringComparison.Ordinal))
+                                        {
+                                            Interlocked.Exchange(ref _accountChanged, 1);
+                                        }
+                                        _accountNotificationStamp = stamp;
+                                    }
+                                }
+                            }
                             if (string.Equals(
                                 method,
                                 "account/rateLimits/updated",

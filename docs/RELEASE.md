@@ -19,14 +19,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File .\scripts\Package-Release.ps1 -Version 1.0.0
+  -File .\scripts\Package-Release.ps1 -Version 1.1.0
 ```
 
 输出：
 
 ```text
-artifacts/release/CodexBalanceWidget-v1.0.0.zip
-artifacts/release/CodexBalanceWidget-v1.0.0.zip.sha256
+artifacts/release/CodexBalanceWidget-v1.1.0.zip
+artifacts/release/CodexBalanceWidget-v1.1.0.zip.sha256
 ```
 
 ZIP 内容由脚本中的精确允许列表控制，不包含 PDB、测试程序、`codex.exe`、
@@ -35,7 +35,7 @@ ZIP 内容由脚本中的精确允许列表控制，不包含 PDB、测试程序
 ## 3. 创建版本
 
 1. 确认主分支 CI 通过且工作区干净。
-2. 创建带注释标签：`v1.0.0`。
+2. 创建带注释标签：`v1.1.0`。
 3. 在 GitHub 的 **Releases → Draft a new release** 中选择该标签。
 4. 上传 ZIP 和 `.sha256` 两个文件。
 5. 在发布说明中列出功能、系统要求、升级说明、已知限制和 SHA-256。

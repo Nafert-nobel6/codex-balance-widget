@@ -143,6 +143,7 @@
 
                 <Grid x:Name="ExpandedDragHandle"
                       Grid.Row="0"
+                      Margin="0,0,32,0"
                       Background="Transparent"
                       Cursor="SizeAll"
                       ToolTip="拖动可小范围调整位置"
@@ -187,6 +188,20 @@
                                  ToolTip="{Binding StatusText}"/>
                     </Grid>
                 </Grid>
+
+                <Button x:Name="MinimizeButton"
+                        Grid.Row="0"
+                        Width="28" Height="28"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Margin="0" Padding="0" BorderThickness="0"
+                        Focusable="False"
+                        Style="{StaticResource FlatButtonStyle}"
+                        ToolTip="最小化为气泡"
+                        AutomationProperties.Name="最小化为气泡"
+                        Click="OnMinimizeClick">
+                    <Border Width="12" Height="2"
+                            Background="{DynamicResource TextBrush}"/>
+                </Button>
 
                 <Grid Grid.Row="1">
                     <Grid x:Name="VerticalLayout">
@@ -380,6 +395,7 @@
                     BorderThickness="1"
                     CornerRadius="13"
                     Padding="12"
+                    PreviewMouseDown="OnWindowPreviewMouseDown"
                     MouseEnter="OnSettingsPanelMouseEnter"
                     MouseLeave="OnSettingsAreaMouseLeave">
                 <Border.Effect>

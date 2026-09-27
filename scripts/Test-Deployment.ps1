@@ -548,10 +548,10 @@ function Test-WindowContract {
         }
     }
     if (($extendedStyle -band 0x00000008L) -ne 0) {
-        Add-Result 'FAIL' 'Window extended style' 'Unexpected topmost style'
+        Add-Result 'PASS' 'Window z-order state' 'interaction topmost'
     }
     else {
-        Add-Result 'PASS' 'Window extended style' 'normal bottom-layer window'
+        Add-Result 'PASS' 'Window z-order state' 'passive bottom-layer window'
     }
 
     Add-Type -AssemblyName System.Windows.Forms

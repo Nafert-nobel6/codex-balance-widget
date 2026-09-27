@@ -9,8 +9,13 @@ namespace CodexBalanceWidget.Core.Tests
     {
         private static int _failed;
 
-        private static int Main()
+        private static int Main(string[] arguments)
         {
+            if (arguments.Length > 0 && arguments[0] == "app-server")
+            {
+                return AccountSwitchTests.RunFakeServer();
+            }
+            Run("account switch, logout and in-flight response isolation", AccountSwitchTests.Run);
             Run("window classification and clamping", TestWindowClassification);
             Run("optional window data", TestOptionalWindows);
             Run("reset-credit detail sorting", TestCreditDetailsAndSorting);

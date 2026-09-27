@@ -1,5 +1,12 @@
 # Codex Balance Widget
 
+当前版本：**1.1.0**。
+
+- 右上角新增横杠最小化按钮，点击立即收为头像气泡，无需等待自动收回。
+- 修复 Codex 不退出时切换账号后额度无法正常更新的问题：检测登录状态变化，
+  清空旧额度并自动重建数据连接；退出登录时显示登录提示。
+- 保留点击后置顶、收回后解除置顶的窗口层级优化。
+
 > 非官方社区工具。本项目不属于 OpenAI，也不代表 OpenAI。Codex 和 OpenAI
 > 名称及相关商标归其权利人所有。
 
@@ -22,7 +29,8 @@ Codex Balance Widget 是 Windows 11 上的右下角额度小窗。它随用户�
 气泡和头像更换。头像通过
 可拖动的圆形裁剪器确认，支持 1–8× 缩放及 176–232 px 裁剪框预览。
 展开界面以头像为视觉原点平滑缩放回气泡，不再逐帧重排窗口。组件默认处于
-普通窗口的下层，不会覆盖正在使用的其他应用。
+普通窗口的下层；用户单击气泡或展开窗口后，组件以不抢焦点的方式置顶，
+自动收回、隐藏或 Codex 最大化时解除置顶。
 
 ## 系统要求
 
@@ -123,7 +131,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Collect-Diagno
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File .\scripts\Package-Release.ps1 -Version 1.0.0
+  -File .\scripts\Package-Release.ps1 -Version 1.1.0
 ```
 
 输出位于 `artifacts\release`。完整源码由 GitHub 仓库提供；Release ZIP

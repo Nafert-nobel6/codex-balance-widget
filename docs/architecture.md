@@ -35,6 +35,9 @@ The app-server client:
 - initializes one JSONL RPC connection;
 - accepts at most 1 MiB per JSONL message with a recursion limit of 64;
 - calls `account/rateLimits/read` immediately and every 30 seconds;
+- checks `account/read` with `refreshToken: false` before each quota read;
+- observes auth-file metadata every second and `account/updated` notifications;
+  invalidates old snapshots and in-flight replies before reconnecting after a change;
 - listens for sparse `account/rateLimits/updated` notifications;
 - refetches a full snapshot after a notification instead of guessing missing
   fields;
@@ -60,8 +63,10 @@ The app-server client:
 ## Window and lifecycle rules
 
 - Borderless, non-activating where possible, no taskbar button, no tray icon.
-- Kept at the bottom of the normal application z-order so it does not cover
-  other applications.
+- The passive bubble stays at the bottom of the normal application z-order.
+  A deliberate click on the bubble or expanded window promotes it to the
+  topmost band without activation; hover-only expansion does not. Automatic
+  collapse, hiding, Codex maximization, and Codex exit remove topmost status.
 - Starts as a 56 px resident bubble anchored to the primary work area's
   lower-right corner with a 24 DIP right gap and 48 DIP bottom gap. Hovering for 1.5 seconds or clicking
   expands it; 10/15/30/60 second idle presets collapse it again.

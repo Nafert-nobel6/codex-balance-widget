@@ -93,6 +93,12 @@ namespace CodexBalanceWidget.VisualHarness
                 SetWindowLongPtr(handle, GwlExStyle, new IntPtr(style));
             };
             window.StopTimers();
+            if (HasArgument(arguments, "--render"))
+            {
+                RenderLayouts(window, HasArgument(arguments, "--dark") ? "dark" : "light");
+                window.Close();
+                return 0;
+            }
             var qaRaiseTimer = new DispatcherTimer();
             qaRaiseTimer.Interval = TimeSpan.FromMilliseconds(650.0);
             qaRaiseTimer.Tick += delegate
@@ -151,6 +157,35 @@ namespace CodexBalanceWidget.VisualHarness
             }
             application.MainWindow = window;
             return application.Run(window);
+        }
+
+        private static void RenderLayouts(WidgetWindow window, string theme)
+        {
+            var output = Path.Combine(Environment.CurrentDirectory, "artifacts", "visual-v1.1");
+            Directory.CreateDirectory(output);
+            typeof(WidgetWindow).GetMethod("CompleteRestore", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(window, null);
+            ((FrameworkElement)window.FindName("MainPanel")).Visibility = Visibility.Visible;
+            var sizes = new[] { new Size(300, 320), new Size(300, 220), new Size(240, 148) };
+            foreach (var size in sizes)
+            {
+                window.Width = size.Width;
+                window.Height = size.Height;
+                typeof(WidgetWindow).GetMethod("ApplyResponsiveLayout", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(window, null);
+                var surface = (FrameworkElement)window.Content;
+                surface.Measure(size);
+                surface.Arrange(new Rect(size));
+                surface.UpdateLayout();
+                var bitmap = new RenderTargetBitmap((int)size.Width * 2, (int)size.Height * 2,
+                    192, 192, PixelFormats.Pbgra32);
+                bitmap.Render(surface);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using (var stream = File.Create(Path.Combine(output,
+                    theme + "-" + size.Width + "x" + size.Height + ".png")))
+                { encoder.Save(stream); }
+            }
         }
 
         private static bool HasArgument(string[] arguments, string expected)

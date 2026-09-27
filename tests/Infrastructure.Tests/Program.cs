@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CodexBalanceWidget.App;
@@ -15,6 +17,8 @@ namespace CodexBalanceWidget.Infrastructure.Tests
 {
     internal static class Program
     {
+        private const int GwlExStyle = -20;
+        private const long WsExTopmost = 0x00000008L;
         private static int _failed;
         private static string _testRoot;
 
@@ -22,6 +26,7 @@ namespace CodexBalanceWidget.Infrastructure.Tests
         private static int Main()
         {
             var application = new Application();
+            application.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             application.Resources["UiFont"] =
                 new FontFamily("Segoe UI, Microsoft YaHei UI");
             _testRoot = Path.Combine(
@@ -36,6 +41,8 @@ namespace CodexBalanceWidget.Infrastructure.Tests
                 Run("avatar crop and circular alpha", TestAvatarCrop);
                 Run("avatar crop window initialization", TestAvatarCropWindowInitialization);
                 Run("same-path avatar refresh", TestSamePathAvatarRefresh);
+                Run("interaction topmost lifecycle", TestInteractionTopmostLifecycle);
+                Run("minimize button immediately collapses and restores", TestMinimizeButton);
                 Run("JPEG EXIF orientation", TestExifOrientation);
                 Run("avatar dimension limit", TestDimensionLimit);
                 Run("avatar file-size limit", TestFileSizeLimit);
@@ -245,6 +252,105 @@ namespace CodexBalanceWidget.Infrastructure.Tests
             {
                 window.Close();
             }
+        }
+
+        private static void TestInteractionTopmostLifecycle()
+        {
+            var directory = NewCaseDirectory("interaction-topmost");
+            var store = new WidgetSettingsStore(directory, null);
+            var window = new WidgetWindow(
+                new WidgetViewModel(),
+                new CodexProcessWindowMonitor(),
+                store,
+                new AvatarImageService(directory, null),
+                new WidgetSettings());
+            window.StopTimers();
+            try
+            {
+                window.Show();
+                var handle = new WindowInteropHelper(window).Handle;
+                var setInteractionTopmost = typeof(WidgetWindow).GetMethod(
+                    "SetInteractionTopmost",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                var collapseToBubble = typeof(WidgetWindow).GetMethod(
+                    "CollapseToBubbleWithoutAnimation",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                AssertTrue(
+                    setInteractionTopmost != null,
+                    "interaction topmost entry point exists");
+                AssertTrue(
+                    collapseToBubble != null,
+                    "bubble collapse entry point exists");
+                AssertTrue(
+                    (GetExtendedStyle(handle) & WsExTopmost) == 0,
+                    "passive bubble starts outside the topmost band");
+
+                var foregroundBefore = GetForegroundWindow();
+                setInteractionTopmost.Invoke(window, new object[] { true });
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Render,
+                    new Action(delegate { }));
+                var promotedStyle = GetExtendedStyle(handle);
+                AssertTrue(
+                    (promotedStyle & WsExTopmost) != 0,
+                    "interaction promotes the window to topmost (Topmost=" +
+                    window.Topmost +
+                    ", style=0x" +
+                    promotedStyle.ToString("X") +
+                    ", handle=" +
+                    handle +
+                    ", visible=" +
+                    window.IsVisible +
+                    ")");
+                AssertEqual(
+                    foregroundBefore,
+                    GetForegroundWindow(),
+                    "topmost promotion preserves the foreground window");
+
+                collapseToBubble.Invoke(window, new object[] { false });
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Render,
+                    new Action(delegate { }));
+                AssertTrue(
+                    (GetExtendedStyle(handle) & WsExTopmost) == 0,
+                    "bubble collapse removes the topmost style");
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+
+        private static void TestMinimizeButton()
+        {
+            var directory = NewCaseDirectory("minimize-button");
+            var window = new WidgetWindow(new WidgetViewModel(),
+                new CodexProcessWindowMonitor(), new WidgetSettingsStore(directory, null),
+                new AvatarImageService(directory, null), new WidgetSettings());
+            window.StopTimers();
+            try
+            {
+                window.Show();
+                var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                var restore = typeof(WidgetWindow).GetMethod("CompleteRestore", flags);
+                restore.Invoke(window, null);
+                var panel = (FrameworkElement)window.FindName("MainPanel");
+                panel.Visibility = Visibility.Visible;
+                window.UpdateLayout();
+                var width = window.Width;
+                var height = window.Height;
+                var button = (Button)window.FindName("MinimizeButton");
+                AssertTrue(button != null, "minimize button is available");
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                AssertEqual(56.0, window.Width, "click immediately sets bubble width");
+                AssertEqual(56.0, window.Height, "click immediately sets bubble height");
+                AssertEqual(Visibility.Collapsed, panel.Visibility, "expanded panel disappears");
+                AssertTrue(!window.Topmost, "manual collapse removes topmost");
+                restore.Invoke(window, null);
+                AssertEqual(width, window.Width, "restore preserves width");
+                AssertEqual(height, window.Height, "restore preserves height");
+            }
+            finally { window.Close(); }
         }
 
         private static byte[] ReadCenterPixel(BitmapSource source)
@@ -487,5 +593,21 @@ namespace CodexBalanceWidget.Infrastructure.Tests
                     ")");
             }
         }
+
+        private static long GetExtendedStyle(IntPtr window)
+        {
+            return IntPtr.Size == 8
+                ? GetWindowLongPtr64(window, GwlExStyle).ToInt64()
+                : GetWindowLong32(window, GwlExStyle);
+        }
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+        private static extern int GetWindowLong32(IntPtr window, int index);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+        private static extern IntPtr GetWindowLongPtr64(IntPtr window, int index);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
     }
 }

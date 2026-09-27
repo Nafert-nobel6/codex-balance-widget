@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.1.0',
 
     [switch]$SkipBuild
 )
@@ -9,7 +9,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
 if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?$') {
-    throw "Version must be a semantic version such as 1.0.0: $Version"
+    throw "Version must be a semantic version such as 1.1.0: $Version"
 }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
